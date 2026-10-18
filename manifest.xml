@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Before use: replace every https://YOUR-USERNAME.github.io/excel-barcode-addin
+  with the HTTPS address where you host these files (see README.md).
+-->
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+
+  <Id>80989369-4dbd-46a2-b19c-4d478fe68762</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Barcode List</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Barcode List"/>
+  <Description DefaultValue="Turns the first column of your sheet into a printable list of barcodes."/>
+  <IconUrl DefaultValue="https://YOUR-USERNAME.github.io/excel-barcode-addin/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://YOUR-USERNAME.github.io/excel-barcode-addin/assets/icon-64.png"/>
+  <SupportUrl DefaultValue="https://github.com/KyriakosGian/Barcode-List-From-Excel"/>
+
+  <AppDomains>
+    <AppDomain>https://cdnjs.cloudflare.com</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Workbook"/>
+  </Hosts>
+
+  <Requirements>
+    <Sets DefaultMinVersion="1.9">
+      <Set Name="ExcelApi" MinVersion="1.9"/>
+    </Sets>
+  </Requirements>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://YOUR-USERNAME.github.io/excel-barcode-addin/taskpane.html"/>
+  </DefaultSettings>
+
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Workbook">
+        <DesktopFormFactor>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="BarcodeList.Group">
+                <Label resid="Group.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16"/>
+                  <bt:Image size="32" resid="Icon.32x32"/>
+                  <bt:Image size="80" resid="Icon.80x80"/>
+                </Icon>
+                <Control xsi:type="Button" id="BarcodeList.OpenPane">
+                  <Label resid="Button.Label"/>
+                  <Supertip>
+                    <Title resid="Button.Label"/>
+                    <Description resid="Button.Tip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16"/>
+                    <bt:Image size="32" resid="Icon.32x32"/>
+                    <bt:Image size="80" resid="Icon.80x80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>BarcodeList.Pane</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="https://YOUR-USERNAME.github.io/excel-barcode-addin/assets/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://YOUR-USERNAME.github.io/excel-barcode-addin/assets/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://YOUR-USERNAME.github.io/excel-barcode-addin/assets/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://YOUR-USERNAME.github.io/excel-barcode-addin/taskpane.html"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="Group.Label" DefaultValue="Barcodes"/>
+        <bt:String id="Button.Label" DefaultValue="Barcode List"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="Button.Tip" DefaultValue="Turn the first column of this sheet into a printable list of barcodes."/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

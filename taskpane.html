@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Barcode List</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<style>
+  :root {
+    --ink: #1c1f1d;
+    --muted: #5d655f;
+    --line: #d5dad5;
+    --paper: #ffffff;
+    --wash: #f4f6f4;
+    --accent: #217346;
+    --accent-ink: #ffffff;
+    --error: #b3261e;
+    --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.45 var(--font); }
+  main { padding: 16px; max-width: 420px; }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .lede { margin: 0 0 16px; color: var(--muted); }
+
+  fieldset { border: 0; padding: 0; margin: 0 0 14px; }
+  legend, label.field { display: block; font-weight: 600; margin-bottom: 4px; padding: 0; }
+  .hint { font-weight: 400; color: var(--muted); }
+
+  .choice { display: flex; align-items: center; gap: 8px; margin: 2px 0; font-weight: 400; }
+  .choice input { margin: 0; accent-color: var(--accent); }
+
+  input[type="text"], input[type="number"], select {
+    width: 100%; padding: 7px 8px; border: 1px solid var(--line); border-radius: 4px;
+    background: var(--paper); color: var(--ink); font: inherit;
+  }
+  .row { display: grid; grid-template-columns: 1fr 96px; gap: 10px; margin-bottom: 14px; }
+  .row > div > .field { margin-bottom: 4px; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
+  button {
+    font: inherit; font-weight: 600; padding: 8px 14px; border-radius: 4px; cursor: pointer;
+    border: 1px solid var(--accent); background: var(--paper); color: var(--accent);
+  }
+  button.primary { background: var(--accent); color: var(--accent-ink); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  #status { min-height: 20px; margin: 0 0 12px; color: var(--muted); }
+  #status.error { color: var(--error); }
+
+  #preview { border-top: 1px solid var(--line); padding-top: 12px; }
+  .print-title { font-size: 16px; font-weight: 600; margin: 0 0 10px; }
+  .print-title:empty { display: none; }
+  .item { margin: 0 0 6px; break-inside: avoid; }
+  .item svg { display: block; max-width: 100%; height: auto; }
+  .item.invalid { color: var(--error); font-size: 13px; padding: 6px 0; }
+
+  @media print {
+    main { max-width: none; padding: 0; }
+    h1, .lede, .controls, #status { display: none !important; }
+    #preview { border: 0; padding: 0; }
+    .print-title:empty { display: none; }
+    .print-title { display: block; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="controls">
+    <h1>Barcode list</h1>
+    <p class="lede">Turn the numbers in your sheet into barcodes you can print.</p>
+
+    <fieldset>
+      <legend>Read barcode numbers from</legend>
+      <label class="choice"><input type="radio" name="source" value="column" checked> First column of this sheet</label>
+      <label class="choice"><input type="radio" name="source" value="selection"> Selected cells <span class="hint">(first column of the selection)</span></label>
+      <label class="choice"><input type="checkbox" id="skipHeader"> First row is a header</label>
+    </fieldset>
+
+    <label class="field" for="listName">List name <span class="hint">(optional)</span></label>
+    <input type="text" id="listName" style="margin-bottom:14px" autocomplete="off">
+
+    <div class="row">
+      <div>
+        <label class="field" for="format">Barcode type</label>
+        <select id="format">
+          <option value="CODE128">Code 128 (any text)</option>
+          <option value="CODE39">Code 39</option>
+          <option value="EAN13">EAN-13</option>
+          <option value="EAN8">EAN-8</option>
+          <option value="UPC">UPC-A</option>
+          <option value="ITF14">ITF-14</option>
+        </select>
+      </div>
+      <div>
+        <label class="field" for="height">Height (px)</label>
+        <input type="number" id="height" value="35" min="10" max="300">
+      </div>
+    </div>
+
+    <label class="choice" style="margin-bottom:14px"><input type="checkbox" id="showText" checked> Show the number under each barcode</label>
+
+    <div class="actions">
+      <button class="primary" id="btnCreate" type="button">Create barcodes</button>
+      <button id="btnInsert" type="button" disabled>Insert into new sheet</button>
+      <button id="btnPrint" type="button" disabled>Print</button>
+    </div>
+    <p id="status" role="status" aria-live="polite"></p>
+  </div>
+
+  <section id="preview" aria-label="Barcode preview" hidden>
+    <h2 class="print-title" id="printTitle"></h2>
+    <div id="list"></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  var items = [];          // { value: string, ok: boolean }
+  var lastOptions = null;  // options used for the current preview
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function setStatus(msg, isError) {
+    var el = $("status");
+    el.textContent = msg || "";
+    el.className = isError ? "error" : "";
+  }
+
+  function toText(v) {
+    if (typeof v === "number") {
+      return v.toLocaleString("en-US", { useGrouping: false, maximumFractionDigits: 10 });
+    }
+    return String(v).trim();
+  }
+
+  function currentOptions() {
+    var h = parseInt($("height").value, 10);
+    if (isNaN(h)) h = 35;
+    h = Math.min(300, Math.max(10, h));
+    return {
+      source: document.querySelector('input[name="source"]:checked').value,
+      skipHeader: $("skipHeader").checked,
+      title: $("listName").value.trim(),
+      format: $("format").value,
+      height: h,
+      showText: $("showText").checked
+    };
+  }
+
+  function barcodeOptions(o) {
+    return { format: o.format, height: o.height, width: 2, margin: 8, fontSize: 14, displayValue: o.showText };
+  }
+
+  // Reads the first column of the sheet, or of the current selection.
+  function readValues(source) {
+    return Excel.run(function (ctx) {
+      var range;
+      if (source === "selection") {
+        range = ctx.workbook.getSelectedRange();
+      } else {
+        range = ctx.workbook.worksheets.getActiveWorksheet()
+          .getRange("A:A").getUsedRangeOrNullObject(true);
+      }
+      range.load("values");
+      return ctx.sync().then(function () {
+        if (range.isNullObject) return [];
+        return range.values.map(function (r) { return r[0]; });
+      });
+    });
+  }
+
+  function tryDraw(target, value, opts) {
+    var ok = true;
+    try {
+      JsBarcode(target, value, Object.assign({}, opts, { valid: function (v) { ok = ok && v; } }));
+    } catch (e) {
+      ok = false;
+    }
+    return ok;
+  }
+
+  function render(opts) {
+    var list = $("list");
+    list.innerHTML = "";
+    var bad = 0;
+    items.forEach(function (it) {
+      var wrap = document.createElement("div");
+      wrap.className = "item";
+      var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      it.ok = tryDraw(svg, it.value, barcodeOptions(opts));
+      if (it.ok) {
+        wrap.appendChild(svg);
+      } else {
+        bad++;
+        wrap.className = "item invalid";
+        wrap.textContent = "\u201C" + it.value + "\u201D can\u2019t be encoded as " +
+          $("format").selectedOptions[0].textContent + ".";
+      }
+      list.appendChild(wrap);
+    });
+    $("printTitle").textContent = opts.title;
+    $("preview").hidden = false;
+    return bad;
+  }
+
+  function create() {
+    var opts = currentOptions();
+    setStatus("Reading your sheet\u2026");
+    $("btnInsert").disabled = true;
+    $("btnPrint").disabled = true;
+
+    readValues(opts.source).then(function (vals) {
+      if (opts.skipHeader) vals = vals.slice(1);
+      items = vals
+        .map(toText)
+        .filter(function (s) { return s !== ""; })
+        .map(function (s) { return { value: s, ok: true }; });
+
+      if (!items.length) {
+        $("preview").hidden = true;
+        setStatus(opts.source === "selection"
+          ? "The selected cells are empty. Select cells that contain barcode numbers."
+          : "Column A is empty. Put the barcode numbers in the first column.", true);
+        return;
+      }
+
+      lastOptions = opts;
+      var bad = render(opts);
+      var good = items.length - bad;
+      if (bad) {
+        setStatus(good + " of " + items.length + " barcodes created. " + bad +
+          " can\u2019t be encoded in this barcode type. Try Code 128 for free text.", true);
+      } else {
+        setStatus(items.length + (items.length === 1 ? " barcode" : " barcodes") + " created.");
+      }
+      $("btnInsert").disabled = good === 0;
+      $("btnPrint").disabled = good === 0;
+    }).catch(function (err) {
+      setStatus("Couldn\u2019t read the sheet: " + (err && err.message ? err.message : err), true);
+    });
+  }
+
+  function insertIntoSheet() {
+    if (!lastOptions) return;
+    var opts = lastOptions;
+    var good = items.filter(function (it) { return it.ok; });
+    if (!good.length) return;
+
+    var images = good.map(function (it) {
+      var canvas = document.createElement("canvas");
+      tryDraw(canvas, it.value, barcodeOptions(opts));
+      return { name: it.value, b64: canvas.toDataURL("image/png").split(",")[1], w: canvas.width, h: canvas.height };
+    });
+
+    setStatus("Adding barcodes to a new sheet\u2026");
+    $("btnInsert").disabled = true;
+
+    Excel.run(function (ctx) {
+      var d = new Date();
+      var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+      var sheet = ctx.workbook.worksheets.add("Barcodes " + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds()));
+      var y = 10;
+      if (opts.title) {
+        var a1 = sheet.getRange("A1");
+        a1.values = [[opts.title]];
+        a1.format.font.bold = true;
+        a1.format.font.size = 14;
+        y = 32;
+      }
+      images.forEach(function (img, i) {
+        var shape = sheet.shapes.addImage(img.b64);
+        shape.name = "Barcode " + (i + 1) + " - " + img.name.slice(0, 40);
+        shape.lockAspectRatio = true;
+        shape.left = 10;
+        shape.top = y;
+        shape.width = img.w * 0.75;
+        shape.height = img.h * 0.75;
+        y += img.h * 0.75 + 8;
+      });
+      sheet.activate();
+      return ctx.sync();
+    }).then(function () {
+      setStatus(images.length + " barcodes added to a new sheet. Print it from Excel as usual.");
+      $("btnInsert").disabled = false;
+    }).catch(function (err) {
+      setStatus("Couldn\u2019t add the sheet: " + (err && err.message ? err.message : err), true);
+      $("btnInsert").disabled = false;
+    });
+  }
+
+  function printList() {
+    try {
+      window.print();
+    } catch (e) {
+      setStatus("Printing isn\u2019t available in this view. Use \u201CInsert into new sheet\u201D and print from Excel.", true);
+    }
+  }
+
+  function init() {
+    $("btnCreate").addEventListener("click", create);
+    $("btnInsert").addEventListener("click", insertIntoSheet);
+    $("btnPrint").addEventListener("click", printList);
+  }
+
+  if (window.Office && Office.onReady) {
+    Office.onReady(function (info) {
+      init();
+      if (info.host !== Office.HostType.Excel) {
+        setStatus("This add-in works inside Excel.", true);
+        $("btnCreate").disabled = true;
+      }
+    });
+  } else {
+    init();
+    setStatus("Office.js didn\u2019t load. Check your internet connection and reopen the pane.", true);
+  }
+})();
+</script>
+</body>
+</html>
